@@ -4,11 +4,11 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "prestart": "echo 'Skipping Prisma generate - using existing client'",
+    "prestart": "npx prisma generate",
     "start": "node dist/index.js",
     "predev": "echo 'Skipping Prisma generate - using existing client'",
     "dev": "npx tsx src/index.ts",
-    "build": "npm run prisma:generate && npm run build:ts",
+    "build": "npm run build:ts",
     "build:ts": "npx tsc",
     "prisma:generate": "./node_modules/.bin/prisma generate",
     "prisma:migrate": "prisma migrate dev",
