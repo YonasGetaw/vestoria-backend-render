@@ -8,7 +8,7 @@
     "start": "node dist/index.js",
     "predev": "echo 'Skipping Prisma generate - using existing client'",
     "dev": "npx tsx src/index.ts",
-    "build": "npx tsc",
+    "build": "npx prisma generate && npx tsc",
     "prisma:generate": "prisma generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
