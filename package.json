@@ -4,13 +4,13 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "prestart": "./node_modules/.bin/prisma generate",
+    "prestart": "node ./node_modules/prisma/build/index.js generate",
     "start": "node dist/index.js",
     "predev": "echo 'Skipping Prisma generate - using existing client'",
     "dev": "npx tsx src/index.ts",
     "build": "npm run build:ts",
-    "build:ts": "./node_modules/.bin/tsc",
-    "prisma:generate": "./node_modules/.bin/prisma generate",
+    "build:ts": "node ./node_modules/typescript/bin/tsc",
+    "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
@@ -33,6 +33,7 @@
     "multer": "^1.4.5-lts.1",
     "nanoid": "^5.0.7",
     "nodemailer": "^6.9.16",
+    "prisma": "^5.22.0",
     "typescript": "^5.7.2",
     "uuid": "^11.0.3",
     "zod": "^3.24.1"
@@ -48,8 +49,6 @@
     "@types/nodemailer": "^7.0.4",
     "@types/uuid": "^10.0.0",
     "eslint": "^9.17.0",
-    "prisma": "^5.22.0",
-    "tsx": "^4.19.2",
-    "typescript": "^5.7.2"
+    "tsx": "^4.19.2"
   }
 }
