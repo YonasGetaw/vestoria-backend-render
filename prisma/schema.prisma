@@ -68,6 +68,8 @@ model User {
   receivedTransactions Transaction[] @relation("ReceivedTransactions")
   referralBonusesGiven ReferralBonus[] @relation("GivenReferralBonuses")
   referralBonusesReceived ReferralBonus[] @relation("ReceivedReferralBonuses")
+  spinChancesGiven SpinChance[] @relation("SpinChancesGiven")
+  spinChancesReceived SpinChance[] @relation("SpinChancesReceived")
   vipLevelRewards VipLevelReward[]
   dailyRewardPlans DailyRewardPlan[]
   dailyRewardClaims DailyRewardClaim[]
@@ -76,6 +78,22 @@ model User {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+}
+
+model SpinChance {
+  id           String   @id @default(cuid())
+  referrerId   String
+  referredId   String   @unique
+  grantedAt    DateTime @default(now())
+  claimedAt    DateTime?
+  rewardCents  Int?
+
+  referrer User @relation("SpinChancesGiven", fields: [referrerId], references: [id], onDelete: Cascade)
+  referred User @relation("SpinChancesReceived", fields: [referredId], references: [id], onDelete: Cascade)
+
+  @@index([referrerId])
+  @@index([referredId])
+  @@index([claimedAt])
 }
 
 model VipLevelReward {

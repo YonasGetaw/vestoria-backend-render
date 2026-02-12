@@ -109,6 +109,80 @@ meRouter.post("/claim-daily-reward", requireAuth, async (req, res) => {
   return res.json(result);
 });
 
+meRouter.get("/daily-reward-status", requireAuth, async (req, res) => {
+  const userId = req.auth!.sub;
+  const anyPrisma = prisma as any;
+
+  const plan = await anyPrisma.dailyRewardPlan.findUnique({ where: { userId } }).catch(() => null);
+  if (!plan) {
+    return res.json({ eligible: false as const, reason: "no_plan" as const, amountCents: 0 });
+  }
+
+  const now = new Date();
+  if (now > new Date(plan.endsAt)) {
+    return res.json({ eligible: false as const, reason: "plan_ended" as const, amountCents: 0 });
+  }
+
+  const lastClaim = await anyPrisma.dailyRewardClaim
+    .findFirst({ where: { userId }, orderBy: { claimedAt: "desc" } })
+    .catch(() => null);
+
+  const cooldownMs = 24 * 60 * 60 * 1000;
+  const nextAt = lastClaim ? new Date(new Date(lastClaim.claimedAt).getTime() + cooldownMs) : null;
+  const eligible = !nextAt || now.getTime() >= nextAt.getTime();
+
+  return res.json({ eligible, amountCents: Number(plan.dailyAmountCents ?? 0), nextAt: eligible ? null : nextAt });
+});
+
+meRouter.get("/spin-status", requireAuth, async (req, res) => {
+  const userId = req.auth!.sub;
+  const anyPrisma = prisma as any;
+
+  const pending = await anyPrisma.spinChance
+    .findFirst({ where: { referrerId: userId, claimedAt: null }, orderBy: { grantedAt: "asc" } })
+    .catch(() => null);
+
+  return res.json({
+    eligible: Boolean(pending),
+    pendingCount: pending ? 1 : 0
+  });
+});
+
+meRouter.post("/claim-spin", requireAuth, async (req, res) => {
+  const userId = req.auth!.sub;
+  const anyPrisma = prisma as any;
+
+  const result = await prisma.$transaction(async (tx) => {
+    const anyTx = tx as any;
+
+    const pending = await anyTx.spinChance.findFirst({
+      where: { referrerId: userId, claimedAt: null },
+      orderBy: { grantedAt: "asc" }
+    });
+    if (!pending) {
+      return { claimed: false as const, reason: "no_chance" as const, rewardCents: 0 };
+    }
+
+    const rewardBirr = Math.random() < 0.5 ? 80 : 100;
+    const rewardCents = rewardBirr * 100;
+    const now = new Date();
+
+    await anyTx.spinChance.update({
+      where: { id: pending.id },
+      data: { claimedAt: now, rewardCents }
+    });
+
+    await tx.user.update({
+      where: { id: userId },
+      data: { balanceCents: { increment: rewardCents } }
+    });
+
+    return { claimed: true as const, reason: "claimed" as const, rewardCents };
+  });
+
+  return res.json(result);
+});
+
 meRouter.post("/withdraw-password", requireAuth, async (req, res) => {
   const body = z
     .object({

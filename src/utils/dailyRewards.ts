@@ -1,13 +1,8 @@
 import type { Prisma } from "@prisma/client";
 
-const TOTAL_DAYS = 48;
-
-function dailyRewardAmountCentsForFirstPurchase(amountCents: number): number | null {
-  if (amountCents <= 300 * 100) return 30 * 100;
-  if (amountCents === 550 * 100) return 50 * 100;
-  if (amountCents === 1100 * 100) return 100 * 100;
-  return null;
-}
+const DAILY_REWARD_CENTS = 30 * 100;
+const TOTAL_DAYS = 3650;
+const COOLDOWN_MS = 24 * 60 * 60 * 1000;
 
 export async function ensureDailyRewardPlanForFirstApprovedPurchase(
   tx: Prisma.TransactionClient,
@@ -29,16 +24,13 @@ export async function ensureDailyRewardPlanForFirstApprovedPurchase(
   });
   if (approvedCount > 0) return;
 
-  const dailyAmountCents = dailyRewardAmountCentsForFirstPurchase(params.amountCents);
-  if (dailyAmountCents == null) return;
-
   const startsAt = new Date();
   const endsAt = new Date(startsAt.getTime() + TOTAL_DAYS * 24 * 60 * 60 * 1000);
 
   await anyTx.dailyRewardPlan.create({
     data: {
       userId: params.userId,
-      dailyAmountCents,
+      dailyAmountCents: DAILY_REWARD_CENTS,
       totalDays: TOTAL_DAYS,
       startsAt,
       endsAt
@@ -61,6 +53,22 @@ export async function claimDailyReward(tx: Prisma.TransactionClient, userId: str
     return { claimed: false as const, reason: "plan_ended" as const, amountCents: 0 };
   }
 
+  const lastClaim = await anyTx.dailyRewardClaim.findFirst({
+    where: { userId },
+    orderBy: { claimedAt: "desc" }
+  });
+  if (lastClaim) {
+    const nextAt = new Date(new Date(lastClaim.claimedAt).getTime() + COOLDOWN_MS);
+    if (now.getTime() < nextAt.getTime()) {
+      return {
+        claimed: false as const,
+        reason: "already_claimed" as const,
+        amountCents: 0,
+        nextAt
+      };
+    }
+  }
+
   const startsAt = new Date(plan.startsAt);
   const elapsedMs = Math.max(0, now.getTime() - startsAt.getTime());
   const dayIndex = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
@@ -81,7 +89,7 @@ export async function claimDailyReward(tx: Prisma.TransactionClient, userId: str
     return { claimed: false as const, reason: "already_claimed" as const, amountCents: 0 };
   }
 
-  const amountCents = Number(plan.dailyAmountCents);
+  const amountCents = DAILY_REWARD_CENTS;
 
   await anyTx.dailyRewardClaim.create({
     data: {

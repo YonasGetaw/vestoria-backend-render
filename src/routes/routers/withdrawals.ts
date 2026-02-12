@@ -28,8 +28,8 @@ withdrawalsRouter.post("/", requireAuth, async (req, res) => {
     })
     .parse(req.body);
 
-  if (body.amountCents < 110 * 100) {
-    return res.status(400).json({ message: "Minimum withdrawal is 110 birr" });
+  if (body.amountCents < 120 * 100) {
+    return res.status(400).json({ message: "Minimum withdrawal is 120 birr" });
   }
 
   const user = await prisma.user.findUnique({

@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import multer from "multer";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
@@ -22,7 +23,11 @@ export const ordersRouter = Router();
 // Multer configuration for payment proof uploads
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, "..", "..", "..", "uploads");
+const uploadsDir = path.join(process.cwd(), "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -147,6 +152,18 @@ ordersRouter.patch("/:orderId/status", requireAuth, async (req, res) => {
 
       // Referral bonus: only on first approved order for a referred user
       if (order.user.referredById) {
+        // Grant a one-time spin chance to the referrer when the referred user makes their first approved deposit
+        if (approvedCount === 0) {
+          await (tx as any).spinChance
+            .create({
+              data: {
+                referrerId: order.user.referredById,
+                referredId: order.userId
+              }
+            })
+            .catch(() => null);
+        }
+
         const existingBonus = await tx.referralBonus.findFirst({
           where: { referredId: order.userId }
         });

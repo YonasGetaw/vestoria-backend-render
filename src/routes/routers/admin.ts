@@ -266,6 +266,18 @@ adminRouter.patch("/orders/:id", async (req, res) => {
 
       // Referral bonus: only on first approved order for a referred user
       if (order.user.referredById) {
+        // Grant a one-time spin chance to the referrer when the referred user makes their first approved deposit
+        if (approvedCount === 0) {
+          await (tx as any).spinChance
+            .create({
+              data: {
+                referrerId: order.user.referredById,
+                referredId: order.userId
+              }
+            })
+            .catch(() => null);
+        }
+
         const existingBonus = await tx.referralBonus.findFirst({
           where: { referredId: order.userId }
         });
