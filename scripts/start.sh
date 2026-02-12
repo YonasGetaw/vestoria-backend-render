@@ -1,5 +1,7 @@
 #!/bin/bash
+echo "Generating Prisma client..."
+node --max-old-space-size=256 ./node_modules/prisma/build/index.js generate
 echo "Running Prisma migrations..."
-npx prisma migrate deploy
+node --max-old-space-size=256 ./node_modules/prisma/build/index.js migrate deploy
 echo "Migrations completed. Starting server..."
-npm start
+node --max-old-space-size=256 dist/index.js

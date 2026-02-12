@@ -4,7 +4,6 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "prestart": "node ./node_modules/prisma/build/index.js generate",
     "start": "bash scripts/start.sh",
     "predev": "echo 'Skipping Prisma generate - using existing client'",
     "dev": "npx tsx src/index.ts",
