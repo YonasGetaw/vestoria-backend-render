@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import multer from "multer";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { v4 as uuidv4 } from "uuid";
@@ -28,7 +29,11 @@ adminRouter.use(requireRole("ADMIN"));
 // Multer configuration for file uploads
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, "..", "..", "..", "uploads");
+const uploadsDir = path.join(process.cwd(), "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
@@ -108,7 +113,9 @@ adminRouter.post("/products", upload.single("image"), async (req, res) => {
 
     const product = await prisma.product.create({ 
       data: {
-        ...body,
+        name: body.name,
+        description: body.description,
+        priceCents: body.priceCents,
         imageUrl
       } 
     });
@@ -139,10 +146,16 @@ adminRouter.patch("/products/:id", upload.single("image"), async (req, res) => {
       imageUrl = `/uploads/${req.file.filename}`;
     }
 
-    const updateData: any = { ...body };
-    if (imageUrl !== undefined) {
-      updateData.imageUrl = imageUrl;
-    }
+    const updateData: {
+      name?: string;
+      description?: string;
+      priceCents?: number;
+      imageUrl?: string;
+      isActive?: boolean;
+    } = {
+      ...body,
+      ...(imageUrl !== undefined ? { imageUrl } : {})
+    };
 
     const product = await prisma.product.update({ 
       where: { id: req.params.id }, 
@@ -183,10 +196,17 @@ adminRouter.put("/payment-settings", async (req, res) => {
     })
     .parse(req.body);
 
+  const data = {
+    commercialBankName: body.commercialBankName,
+    commercialAccountNumber: body.commercialAccountNumber,
+    telebirrPhone: body.telebirrPhone,
+    cbeBirrPhone: body.cbeBirrPhone
+  };
+
   const existing = await prisma.paymentSettings.findFirst();
   const settings = existing
-    ? await prisma.paymentSettings.update({ where: { id: existing.id }, data: body })
-    : await prisma.paymentSettings.create({ data: body });
+    ? await prisma.paymentSettings.update({ where: { id: existing.id }, data })
+    : await prisma.paymentSettings.create({ data });
 
   return res.json({ settings });
 });

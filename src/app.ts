@@ -3,6 +3,7 @@ import cors from "cors";
 import helmet from "helmet";
 import morgan from "morgan";
 import cookieParser from "cookie-parser";
+import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 
@@ -57,7 +58,11 @@ app.use(express.json({ limit: "1mb" }));
 app.use(cookieParser());
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const uploadsDir = path.join(__dirname, "..", "uploads");
+const uploadsDir = path.join(process.cwd(), "uploads");
+
+if (!fs.existsSync(uploadsDir)) {
+  fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // Serve uploads with proper CORS headers
 app.use("/uploads", (req, res, next) => {
@@ -84,7 +89,7 @@ app.get("/api/health", (_req, res) => {
 app.get("/api/test-images", (_req, res) => {
   const fs = require('fs');
   const path = require('path');
-  const uploadsDir = path.join(__dirname, "..", "uploads");
+  const uploadsDir = path.join(process.cwd(), "uploads");
   
   try {
     const files = fs.readdirSync(uploadsDir).slice(0, 5) as string[]; // Get first 5 files
@@ -103,7 +108,7 @@ app.get("/api/test-images", (_req, res) => {
 app.get("/api/images/:filename", (req, res) => {
   const fs = require('fs');
   const path = require('path');
-  const uploadsDir = path.join(__dirname, "..", "uploads");
+  const uploadsDir = path.join(process.cwd(), "uploads");
   const filename = req.params.filename;
   const filePath = path.join(uploadsDir, filename);
   
