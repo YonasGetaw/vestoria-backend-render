@@ -4,7 +4,7 @@
   "type": "module",
   "main": "dist/index.js",
   "scripts": {
-    "start": "bash scripts/reset.sh",
+    "start": "bash scripts/start.sh",
     "predev": "echo 'Skipping Prisma generate - using existing client'",
     "dev": "npx tsx src/index.ts",
     "build": "npm run build:ts",
