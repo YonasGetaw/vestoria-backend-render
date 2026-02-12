@@ -61,6 +61,7 @@ model User {
   vipLevel Int @default(1)
   balanceCents Int @default(0)
   reservedBalanceCents Int @default(0)
+  assetsCents Int @default(0)
 
   orders        Order[]
   withdrawals   Withdrawal[]

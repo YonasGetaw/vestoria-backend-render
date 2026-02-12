@@ -251,69 +251,21 @@ adminRouter.patch("/orders/:id", async (req, res) => {
         }
       });
 
-      const bonusCents = approvedCount === 0 ? firstPurchaseBonusCents(order.amountCents) : 0;
-
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { balanceCents: { increment: order.amountCents + bonusCents } }
-      });
-
       await ensureDailyRewardPlanForFirstApprovedPurchase(tx, {
         userId: order.userId,
         orderId: order.id,
         amountCents: order.amountCents
       });
 
-      // Referral bonus: only on first approved order for a referred user
-      if (order.user.referredById) {
-        // Grant a one-time spin chance to the referrer when the referred user makes their first approved deposit
-        if (approvedCount === 0) {
-          await (tx as any).spinChance
-            .create({
-              data: {
-                referrerId: order.user.referredById,
-                referredId: order.userId
-              }
-            })
-            .catch(() => null);
-        }
-
-        const existingBonus = await tx.referralBonus.findFirst({
-          where: { referredId: order.userId }
-        });
-        if (!existingBonus) {
-          const priceCents = order.product.priceCents;
-          // Tier mapping: you can customize these thresholds
-          let tier = 1;
-          let bonusCents = 0;
-          if (priceCents >= 10000) { // 100+ ETB
-            tier = 3;
-            bonusCents = Math.round(priceCents * 0.10); // 10%
-          } else if (priceCents >= 5000) { // 50–99.99 ETB
-            tier = 2;
-            bonusCents = Math.round(priceCents * 0.05); // 5%
-          } else { // < 50 ETB
-            tier = 1;
-            bonusCents = Math.round(priceCents * 0.03); // 3%
-          }
-
-          await tx.referralBonus.create({
+      if (order.user.referredById && approvedCount === 0) {
+        await (tx as any).spinChance
+          .create({
             data: {
               referrerId: order.user.referredById,
-              referredId: order.userId,
-              orderId: order.id,
-              amountCents: bonusCents,
-              tier
+              referredId: order.userId
             }
-          });
-
-          await tx.user.update({
-            where: { id: order.user.referredById },
-            data: { balanceCents: { increment: bonusCents } }
-          });
-
-          await applyVipProgression(tx, order.user.referredById);
-        }
+          })
+          .catch(() => null);
       }
     }
 
@@ -355,57 +307,21 @@ adminRouter.patch("/orders/:id/status", async (req, res) => {
         }
       });
 
-      const bonusCents = approvedCount === 0 ? firstPurchaseBonusCents(order.amountCents) : 0;
-
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { balanceCents: { increment: order.amountCents + bonusCents } }
-      });
-
       await ensureDailyRewardPlanForFirstApprovedPurchase(tx, {
         userId: order.userId,
         orderId: order.id,
         amountCents: order.amountCents
       });
 
-      // Referral bonus: only on first approved order for a referred user
-      if (order.user.referredById) {
-        const existingBonus = await tx.referralBonus.findFirst({
-          where: { referredId: order.userId }
-        });
-        if (!existingBonus) {
-          const priceCents = order.product.priceCents;
-          // Tier mapping: you can customize these thresholds
-          let tier = 1;
-          let bonusCents = 0;
-          if (priceCents >= 10000) { // 100+ ETB
-            tier = 3;
-            bonusCents = Math.round(priceCents * 0.10); // 10%
-          } else if (priceCents >= 5000) { // 50–99.99 ETB
-            tier = 2;
-            bonusCents = Math.round(priceCents * 0.05); // 5%
-          } else { // < 50 ETB
-            tier = 1;
-            bonusCents = Math.round(priceCents * 0.03); // 3%
-          }
-
-          await tx.referralBonus.create({
+      if (order.user.referredById && approvedCount === 0) {
+        await (tx as any).spinChance
+          .create({
             data: {
               referrerId: order.user.referredById,
-              referredId: order.userId,
-              orderId: order.id,
-              amountCents: bonusCents,
-              tier
+              referredId: order.userId
             }
-          });
-
-          await tx.user.update({
-            where: { id: order.user.referredById },
-            data: { balanceCents: { increment: bonusCents } }
-          });
-
-          await applyVipProgression(tx, order.user.referredById);
-        }
+          })
+          .catch(() => null);
       }
     }
 
@@ -457,7 +373,7 @@ adminRouter.patch("/withdrawals/:id", async (req, res) => {
         where: { id: withdrawal.userId },
         data: {
           reservedBalanceCents: { decrement: withdrawal.amountCents },
-          balanceCents: { decrement: withdrawal.amountCents }
+          assetsCents: { decrement: withdrawal.amountCents }
         }
       });
     }

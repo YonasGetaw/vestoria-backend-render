@@ -12,6 +12,7 @@
     "prisma:generate": "node ./node_modules/prisma/build/index.js generate",
     "prisma:migrate": "prisma migrate dev",
     "prisma:seed": "prisma db seed",
+    "db:seed": "prisma db seed",
     "prisma:studio": "prisma studio",
     "lint": "eslint ."
   },
@@ -39,6 +40,7 @@
     "nanoid": "^5.0.7",
     "nodemailer": "^6.9.16",
     "prisma": "^5.22.0",
+    "ts-node": "^10.9.2",
     "typescript": "^5.7.2",
     "uuid": "^11.0.3",
     "zod": "^3.24.1"
@@ -46,5 +48,8 @@
   "devDependencies": {
     "eslint": "^9.17.0",
     "tsx": "^4.19.2"
+  },
+  "prisma": {
+    "seed": "node seed.js"
   }
 }

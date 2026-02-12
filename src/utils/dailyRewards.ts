@@ -1,8 +1,19 @@
 import type { Prisma } from "@prisma/client";
 
-const DAILY_REWARD_CENTS = 30 * 100;
-const TOTAL_DAYS = 3650;
 const COOLDOWN_MS = 24 * 60 * 60 * 1000;
+
+// Daily reward tiers based on total deposits
+function getDailyRewardForDeposits(totalDepositCents: number) {
+  if (totalDepositCents >= 1100 * 100) return 70 * 100; // 70 birr
+  if (totalDepositCents >= 550 * 100) return 25 * 100;  // 25 birr
+  return 0; // no daily reward until 550 birr deposited
+}
+
+// Bonus assets based on total deposits
+function getBonusAssetsForDeposits(totalDepositCents: number) {
+  if (totalDepositCents >= 550 * 100) return 100 * 100; // 100 birr assets at 550 (first time only)
+  return 0; // no bonus until 550 birr deposited
+}
 
 export async function ensureDailyRewardPlanForFirstApprovedPurchase(
   tx: Prisma.TransactionClient,
@@ -24,14 +35,39 @@ export async function ensureDailyRewardPlanForFirstApprovedPurchase(
   });
   if (approvedCount > 0) return;
 
+  // Calculate total deposits for this user
+  const depositResult = await anyTx.order.aggregate({
+    where: {
+      userId: params.userId,
+      status: { in: ["APPROVED", "COMPLETED"] }
+    },
+    _sum: { amountCents: true }
+  });
+  const totalDepositCents = depositResult._sum.amountCents || 0;
+
+  // Determine daily reward amount
+  const dailyAmountCents = getDailyRewardForDeposits(totalDepositCents);
+  if (dailyAmountCents === 0) return; // No daily reward yet
+
+  // Award bonus assets if threshold reached
+  const bonusAssetsCents = getBonusAssetsForDeposits(totalDepositCents);
+  if (bonusAssetsCents > 0) {
+    await tx.user.update({
+      where: { id: params.userId },
+      data: { 
+        assetsCents: { increment: bonusAssetsCents }
+      }
+    });
+  }
+
   const startsAt = new Date();
-  const endsAt = new Date(startsAt.getTime() + TOTAL_DAYS * 24 * 60 * 60 * 1000);
+  const endsAt = new Date(startsAt.getTime() + 3650 * 24 * 60 * 60 * 1000);
 
   await anyTx.dailyRewardPlan.create({
     data: {
       userId: params.userId,
-      dailyAmountCents: DAILY_REWARD_CENTS,
-      totalDays: TOTAL_DAYS,
+      dailyAmountCents,
+      totalDays: 3650,
       startsAt,
       endsAt
     }
@@ -73,7 +109,7 @@ export async function claimDailyReward(tx: Prisma.TransactionClient, userId: str
   const elapsedMs = Math.max(0, now.getTime() - startsAt.getTime());
   const dayIndex = Math.floor(elapsedMs / (24 * 60 * 60 * 1000));
 
-  if (dayIndex >= Number(plan.totalDays ?? TOTAL_DAYS)) {
+  if (dayIndex >= Number(plan.totalDays ?? 3650)) {
     return { claimed: false as const, reason: "plan_ended" as const, amountCents: 0 };
   }
 
@@ -89,7 +125,7 @@ export async function claimDailyReward(tx: Prisma.TransactionClient, userId: str
     return { claimed: false as const, reason: "already_claimed" as const, amountCents: 0 };
   }
 
-  const amountCents = DAILY_REWARD_CENTS;
+  const amountCents = plan.dailyAmountCents;
 
   await anyTx.dailyRewardClaim.create({
     data: {
@@ -102,7 +138,7 @@ export async function claimDailyReward(tx: Prisma.TransactionClient, userId: str
 
   await tx.user.update({
     where: { id: userId },
-    data: { balanceCents: { increment: amountCents } }
+    data: { assetsCents: { increment: amountCents } }
   });
 
   return { claimed: true as const, reason: "claimed" as const, amountCents };

@@ -34,7 +34,7 @@ withdrawalsRouter.post("/", requireAuth, async (req, res) => {
 
   const user = await prisma.user.findUnique({
     where: { id: req.auth!.sub },
-    select: { id: true, withdrawPasswordHash: true, balanceCents: true, reservedBalanceCents: true }
+    select: { id: true, withdrawPasswordHash: true, assetsCents: true, reservedBalanceCents: true }
   });
 
   if (!user) return res.status(404).json({ message: "User not found" });
@@ -43,7 +43,7 @@ withdrawalsRouter.post("/", requireAuth, async (req, res) => {
   const ok = await verifyPassword(body.withdrawPassword, user.withdrawPasswordHash);
   if (!ok) return res.status(400).json({ message: "Invalid withdraw password" });
 
-  const available = user.balanceCents - user.reservedBalanceCents;
+  const available = user.assetsCents - user.reservedBalanceCents;
   if (body.amountCents > available) {
     return res.status(400).json({ message: "Insufficient available balance" });
   }

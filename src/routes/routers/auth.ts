@@ -68,7 +68,8 @@ authRouter.post("/register", async (req, res) => {
   });
 
   if (referredById) {
-    await prisma.user.update({ where: { id: referredById }, data: { points: { increment: 1 } } });
+    // Don't award referral bonus on registration - only on first deposit
+    // The bonus will be awarded in orders.ts when the referred user makes their first approved deposit
   }
 
   return res.status(201).json({ user });

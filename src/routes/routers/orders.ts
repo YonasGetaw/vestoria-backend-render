@@ -8,17 +8,9 @@ import { v4 as uuidv4 } from "uuid";
 
 import { requireAuth } from "../../middleware/auth.js";
 import { prisma } from "../../db/prisma.js";
-import { applyVipProgression } from "../../utils/vip.js";
 import { ensureDailyRewardPlanForFirstApprovedPurchase } from "../../utils/dailyRewards.js";
 
 export const ordersRouter = Router();
-
- function firstPurchaseBonusCents(amountCents: number): number {
-   if (amountCents <= 300 * 100) return 90 * 100;
-   if (amountCents <= 550 * 100) return 130 * 100;
-   if (amountCents <= 1100 * 100) return 400 * 100;
-   return 0;
- }
 
 // Multer configuration for payment proof uploads
 const __filename = fileURLToPath(import.meta.url);
@@ -137,13 +129,6 @@ ordersRouter.patch("/:orderId/status", requireAuth, async (req, res) => {
         }
       });
 
-      const bonusCents = approvedCount === 0 ? firstPurchaseBonusCents(order.amountCents) : 0;
-
-      await tx.user.update({
-        where: { id: order.userId },
-        data: { balanceCents: { increment: order.amountCents + bonusCents } }
-      });
-
       await ensureDailyRewardPlanForFirstApprovedPurchase(tx, {
         userId: order.userId,
         orderId: order.id,
@@ -162,43 +147,6 @@ ordersRouter.patch("/:orderId/status", requireAuth, async (req, res) => {
               }
             })
             .catch(() => null);
-        }
-
-        const existingBonus = await tx.referralBonus.findFirst({
-          where: { referredId: order.userId }
-        });
-        if (!existingBonus) {
-          const priceCents = order.product.priceCents;
-          // Tier mapping: you can customize these thresholds
-          let tier = 1;
-          let bonusCents = 0;
-          if (priceCents >= 10000) { // 100+ ETB
-            tier = 3;
-            bonusCents = Math.round(priceCents * 0.10); // 10%
-          } else if (priceCents >= 5000) { // 50–99.99 ETB
-            tier = 2;
-            bonusCents = Math.round(priceCents * 0.05); // 5%
-          } else { // < 50 ETB
-            tier = 1;
-            bonusCents = Math.round(priceCents * 0.03); // 3%
-          }
-
-          await tx.referralBonus.create({
-            data: {
-              referrerId: order.user.referredById,
-              referredId: order.userId,
-              orderId: order.id,
-              amountCents: bonusCents,
-              tier
-            }
-          });
-
-          await tx.user.update({
-            where: { id: order.user.referredById },
-            data: { balanceCents: { increment: bonusCents } }
-          });
-
-          await applyVipProgression(tx, order.user.referredById);
         }
       }
     }

@@ -20,6 +20,7 @@ meRouter.get("/", requireAuth, async (req, res) => {
       referralCode: true,
       points: true,
       balanceCents: true,
+      assetsCents: true,
       reservedBalanceCents: true,
       withdrawPasswordHash: true
     }
@@ -50,7 +51,7 @@ meRouter.get("/account-stats", requireAuth, async (req, res) => {
   endOfDay.setDate(endOfDay.getDate() + 1);
 
   const [user, rechargeAgg, withdrawAgg, teamIncomeAgg] = await Promise.all([
-    prisma.user.findUnique({ where: { id: userId }, select: { balanceCents: true, reservedBalanceCents: true } }),
+    prisma.user.findUnique({ where: { id: userId }, select: { assetsCents: true, reservedBalanceCents: true } }),
     prisma.order.aggregate({
       where: { userId, status: { in: ["APPROVED", "COMPLETED"] } },
       _sum: { amountCents: true }
@@ -67,7 +68,7 @@ meRouter.get("/account-stats", requireAuth, async (req, res) => {
 
   const totalRechargeCents = rechargeAgg._sum.amountCents ?? 0;
   const totalWithdrawCents = withdrawAgg._sum.amountCents ?? 0;
-  const totalAssetsCents = (user?.balanceCents ?? 0) + (user?.reservedBalanceCents ?? 0);
+  const totalAssetsCents = (user?.assetsCents ?? 0) + (user?.reservedBalanceCents ?? 0);
   const teamIncomeCents = teamIncomeAgg._sum.amountCents ?? 0;
 
   const anyPrisma = prisma as any;
@@ -174,7 +175,7 @@ meRouter.post("/claim-spin", requireAuth, async (req, res) => {
 
     await tx.user.update({
       where: { id: userId },
-      data: { balanceCents: { increment: rewardCents } }
+      data: { assetsCents: { increment: rewardCents } }
     });
 
     return { claimed: true as const, reason: "claimed" as const, rewardCents };
