@@ -149,6 +149,131 @@ meRouter.get("/spin-status", requireAuth, async (req, res) => {
   });
 });
 
+meRouter.get("/activity", requireAuth, async (req, res) => {
+  const userId = req.auth!.sub;
+  const limit = Math.min(200, Math.max(1, Number(req.query.limit ?? 50)));
+  const anyPrisma = prisma as any;
+
+  const [orders, withdrawals, sentTx, receivedTx, dailyClaims, spinClaims] = await Promise.all([
+    prisma.order.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        amountCents: true,
+        status: true,
+        createdAt: true,
+        product: { select: { id: true, name: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    }),
+    prisma.withdrawal.findMany({
+      where: { userId },
+      select: {
+        id: true,
+        amountCents: true,
+        status: true,
+        method: true,
+        createdAt: true,
+        approvedAt: true,
+        rejectedAt: true
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    }),
+    prisma.transaction.findMany({
+      where: { fromUserId: userId },
+      select: {
+        id: true,
+        amountCents: true,
+        type: true,
+        createdAt: true,
+        toUser: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    }),
+    prisma.transaction.findMany({
+      where: { toUserId: userId },
+      select: {
+        id: true,
+        amountCents: true,
+        type: true,
+        createdAt: true,
+        fromUser: { select: { id: true, name: true, email: true } }
+      },
+      orderBy: { createdAt: "desc" },
+      take: limit
+    }),
+    anyPrisma.dailyRewardClaim
+      .findMany({
+        where: { userId },
+        select: { id: true, amountCents: true, claimedAt: true },
+        orderBy: { claimedAt: "desc" },
+        take: limit
+      })
+      .catch(() => [] as Array<{ id: string; amountCents: number; claimedAt: Date }>),
+    anyPrisma.spinChance
+      .findMany({
+        where: { referrerId: userId, claimedAt: { not: null } },
+        select: { id: true, rewardCents: true, claimedAt: true },
+        orderBy: { claimedAt: "desc" },
+        take: limit
+      })
+      .catch(() => [] as Array<{ id: string; rewardCents: number | null; claimedAt: Date | null }>)
+  ]);
+
+  const items = [
+    ...orders.map((o) => ({
+      id: `order:${o.id}`,
+      kind: "ORDER" as const,
+      amountCents: o.amountCents,
+      createdAt: o.createdAt,
+      meta: { status: o.status, productId: o.product.id, productName: o.product.name }
+    })),
+    ...withdrawals.map((w) => ({
+      id: `withdrawal:${w.id}`,
+      kind: "WITHDRAWAL" as const,
+      amountCents: w.amountCents,
+      createdAt: w.createdAt,
+      meta: { status: w.status, method: w.method, approvedAt: w.approvedAt, rejectedAt: w.rejectedAt }
+    })),
+    ...sentTx.map((t) => ({
+      id: `tx:${t.id}`,
+      kind: "SEND" as const,
+      amountCents: t.amountCents,
+      createdAt: t.createdAt,
+      meta: { to: t.toUser }
+    })),
+    ...receivedTx.map((t) => ({
+      id: `tx:${t.id}`,
+      kind: "RECEIVE" as const,
+      amountCents: t.amountCents,
+      createdAt: t.createdAt,
+      meta: { from: t.fromUser }
+    })),
+    ...dailyClaims.map((c) => ({
+      id: `daily:${c.id}`,
+      kind: "DAILY_REWARD" as const,
+      amountCents: c.amountCents,
+      createdAt: c.claimedAt,
+      meta: {}
+    })),
+    ...spinClaims.map((c) => ({
+      id: `spin:${c.id}`,
+      kind: "SPIN_REWARD" as const,
+      amountCents: c.rewardCents ?? 0,
+      createdAt: c.claimedAt ?? new Date(0),
+      meta: {}
+    }))
+  ]
+    .filter((i) => i.createdAt instanceof Date && !Number.isNaN(i.createdAt.getTime()))
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+    .slice(0, limit);
+
+  return res.json({ items });
+});
+
 meRouter.post("/claim-spin", requireAuth, async (req, res) => {
   const userId = req.auth!.sub;
   const anyPrisma = prisma as any;
