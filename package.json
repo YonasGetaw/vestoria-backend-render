@@ -15,9 +15,6 @@
     "prisma:studio": "prisma studio",
     "lint": "eslint ."
   },
-  "prisma": {
-    "seed": "npx tsx prisma/seed.ts"
-  },
   "dependencies": {
     "@prisma/client": "^5.22.0",
     "@types/cookie-parser": "^1.4.7",
